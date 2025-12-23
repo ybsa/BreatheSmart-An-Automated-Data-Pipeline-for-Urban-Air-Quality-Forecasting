@@ -1,66 +1,51 @@
-"""
-Debug script to test OpenAQ API v3 connection with API key
-"""
 import requests
 import json
 import os
 from dotenv import load_dotenv
 
-# Load API key from .env
 load_dotenv()
+
 API_KEY = os.getenv('OPENAQ_API_KEY')
+HEADERS = {'X-API-Key': API_KEY}
 
-print("=" * 80)
-print("Testing OpenAQ API v3 Connection")
-print("=" * 80)
-print(f"\n🔑 API Key loaded: {'✅ Yes' if API_KEY else '❌ No'}")
-if API_KEY:
-    print(f"    Key preview: {API_KEY[:20]}...")
-
-# v3 endpoint
-url = "https://api.openaq.org/v3/measurements"
-params = {
-    "locations_name": "Abu Dhabi",
-    "parameters_id": 2,  # 2 = PM2.5
-    "limit": 5
-}
-
-# Add API key to headers
-headers = {}
-if API_KEY:
-    headers['X-API-Key'] = API_KEY
-
-print(f"\n🔗 Request URL: {url}")
-print(f"📋 Parameters: {json.dumps(params, indent=2)}")
-print(f"🔐 Headers: {'X-API-Key present' if headers else 'No headers'}")
-
-try:
-    print("\n⏳ Sending request...")
-    response = requests.get(url, params=params, headers=headers, timeout=30)
+def debug_structure():
+    # 1. Get sensors for location 1285339
+    loc_id = 1285339
+    url_sensors = f"https://api.openaq.org/v3/locations/{loc_id}/sensors"
+    print(f"Fetching sensors: {url_sensors}")
     
-    print(f"\n📊 Response Status: {response.status_code}")
+    resp = requests.get(url_sensors, headers=HEADERS)
+    if resp.status_code != 200:
+        print(f"Error fetching sensors: {resp.status_code} {resp.text}")
+        return
+
+    sensors = resp.json().get('results', [])
+    if not sensors:
+        print("No sensors found.")
+        return
+
+    # 2. Pick first sensor
+    sensor_id = sensors[0]['id']
+    parameter = sensors[0]['parameter']['name']
+    print(f"Testing Sensor ID: {sensor_id} ({parameter})")
+
+    # 3. Get measurements
+    url_meas = f"https://api.openaq.org/v3/sensors/{sensor_id}/measurements"
+    params = {'limit': 1}
+    print(f"Fetching measurements: {url_meas}")
     
-    if response.status_code == 200:
-        data = response.json()
-        print(f"\n✅ SUCCESS! Received data:")
-        print(f"   - Results count: {len(data.get('results', []))}")
-        
-        if data.get('results'):
-            print(f"\n📝 First result sample:")
-            result = data['results'][0]
-            print(f"   - Location: {result.get('location', {}).get('name', 'N/A')}")
-            print(f"   - Value: {result.get('value')} {result.get('parameter', {}).get('units', 'µg/m³')}")
-            print(f"   - DateTime: {result.get('datetime')}")
-            print(f"\n✅ API Connection Working!")
-        else:
-            print("\n⚠️  No results in response")
-            print(f"Full response: {json.dumps(data, indent=2)[:500]}")
+    resp_m = requests.get(url_meas, headers=HEADERS, params=params)
+    if resp_m.status_code != 200:
+        print(f"Error fetching measurements: {resp_m.status_code} {resp_m.text}")
+        return
+
+    results = resp_m.json().get('results', [])
+    if results:
+        print("\n--- RAW MEASUREMENT OBJECT ---")
+        print(json.dumps(results[0], indent=2))
+        print("------------------------------")
     else:
-        print(f"\n❌ Request failed with status {response.status_code}")
-        print(f"Response body: {response.text[:500]}")
-        
-except Exception as e:
-    print(f"\n❌ Error: {e}")
-    import traceback
-    traceback.print_exc()
+        print("No measurements found.")
 
+if __name__ == "__main__":
+    debug_structure()

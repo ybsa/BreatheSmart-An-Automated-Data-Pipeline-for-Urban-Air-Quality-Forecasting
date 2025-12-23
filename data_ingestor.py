@@ -19,7 +19,7 @@ import sys
 from config import (
     OPENAQ_API_V2_URL, TARGET_CITY, RAW_DATA_PATH, LOGS_PATH,
     MAX_PM25_VALUE, MAX_RETRIES, RETRY_BACKOFF_FACTOR, REQUEST_TIMEOUT,
-    PARAMETERS, LOG_FORMAT, LOG_LEVEL
+    PARAMETERS, LOG_FORMAT, LOG_LEVEL, OPENAQ_API_KEY
 )
 
 # Setup logging
@@ -28,11 +28,116 @@ logging.basicConfig(
     level=getattr(logging, LOG_LEVEL),
     format=LOG_FORMAT,
     handlers=[
-        logging.FileHandler(log_file),
+        logging.FileHandler(log_file, encoding='utf-8'),
         logging.StreamHandler(sys.stdout)
     ]
 )
 logger = logging.getLogger(__name__)
+
+
+
+def fetch_measurements_for_id(location_id, params, headers, parameter):
+    """
+    Fetch measurements for a location by first Resolving its Sensors.
+    Flow: Location -> Sensors -> Match Parameter -> Fetch Measurements
+    """
+    # 1. Get Sensors for this location
+    sensors_url = f"https://api.openaq.org/v3/locations/{location_id}/sensors"
+    try:
+        # Use a short timeout for sensor lookup
+        resp = requests.get(sensors_url, headers=headers, timeout=10)
+        resp.raise_for_status()
+        sensors = resp.json().get('results', [])
+    except Exception as e:
+        logger.warning(f"Failed to fetch sensors for location {location_id}: {e}")
+        return pd.DataFrame()
+
+    if not sensors:
+        return pd.DataFrame()
+
+    # 2. Find sensor for our target parameter
+    target_sensor_id = None
+    target_unit = 'µg/m³' # Default
+    
+    for s in sensors:
+        s_param = s.get('parameter', {}).get('name', '').lower()
+        if s_param == parameter.lower():
+            target_sensor_id = s.get('id')
+            target_unit = s.get('parameter', {}).get('units', target_unit)
+            break
+    
+    if not target_sensor_id:
+        # logger.debug(f"Location {location_id} has no sensor for {parameter}")
+        return pd.DataFrame()
+
+    # 3. Fetch measurements for this sensor
+    meas_url = f"https://api.openaq.org/v3/sensors/{target_sensor_id}/measurements"
+    
+    # Clean params for sensor endpoint (doesn't need location_id etc)
+    # v3 limit often capped at 1000
+    safe_limit = min(params.get('limit', 1000), 1000)
+    sensor_params = {
+        "limit": safe_limit,
+        "date_from": params.get('date_from'),
+        "date_to": params.get('date_to'),
+        # "order_by": "datetime" # API v3 default is usually latest, but let's see
+    }
+    
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            response = requests.get(
+                meas_url,
+                params=sensor_params,
+                headers=headers,
+                timeout=REQUEST_TIMEOUT
+            )
+            response.raise_for_status()
+            data = response.json()
+            results = data.get('results', [])
+            
+            if not results:
+                return pd.DataFrame()
+            
+            # Process results
+            processed_rows = []
+            for row in results:
+                try:
+                    # Sensor response structure might be slightly different or same
+                    val = row.get('value')
+                    if val is None: continue
+                    
+                    processed_row = {
+                        'location': f"Location {location_id}",
+                        'parameter': parameter,
+                        'value': val,
+                        'unit': target_unit,
+                        'city': TARGET_CITY
+                    }
+
+                    # Extract date from period -> datetimeFrom -> utc
+                    period = row.get('period', {})
+                    dt_from = period.get('datetimeFrom', {})
+                    dt_utc = dt_from.get('utc')
+                    
+                    if dt_utc:
+                        processed_row['date_utc'] = dt_utc
+                        processed_row['date_local'] = dt_from.get('local')
+                    else:
+                        continue # Skip if no date
+                    
+                    processed_rows.append(processed_row)
+                except Exception as e:
+                    continue
+            
+            return pd.DataFrame(processed_rows)
+
+        except Exception as e:
+            if attempt < MAX_RETRIES:
+                time.sleep(RETRY_BACKOFF_FACTOR ** attempt)
+            else:
+                logger.warning(f"Failed to fetch measurements for sensor {target_sensor_id}: {e}")
+                return pd.DataFrame()
+    return pd.DataFrame()
 
 
 def fetch_air_quality_data(
@@ -40,151 +145,119 @@ def fetch_air_quality_data(
     parameter: str = 'pm25',
     limit: int = 1000,
     date_from: str = None,
-    date_to: str = None
+    date_to: str = None,
+    location_ids: list = None
 ) -> pd.DataFrame:
-    """
-    Fetch air quality data from OpenAQ API v3 with retry logic
+    """Fetch air quality data handling multiple locations"""
     
-    Args:
-        city: Target city name (default: Abu Dhabi)
-        parameter: Pollutant parameter (pm25, pm10, no2, etc.)
-        limit: Max number of records to fetch per request
-        date_from: Start date in ISO format (YYYY-MM-DD)
-        date_to: End date in ISO format (YYYY-MM-DD)
-    
-    Returns:
-        pandas DataFrame with air quality measurements
-    """
-    # v3 API uses different parameter format
+    # Setup base params (order, dates, parameter)
     params = {
         "limit": limit,
         "order_by": "datetime"
     }
     
-    # v3 uses 'locations_name' instead of 'city'
-    if city:
-        params['locations_name'] = city
-    
-    # v3 uses 'parameters_id' instead of 'parameter'
+    # Parameter mapping
+    param_map = {'pm25': 2, 'pm10': 1, 'no2': 3, 'o3': 5, 'so2': 8, 'co': 7}
     if parameter:
-        # Parameter IDs in v3: pm25=2, pm10=1, no2=3, o3=5, so2=8, co=7
-        param_map = {'pm25': 2, 'pm10': 1, 'no2': 3, 'o3': 5, 'so2': 8, 'co': 7}
         params['parameters_id'] = param_map.get(parameter.lower(), 2)
     
-    if date_from:
-        params['date_from'] = date_from
-    if date_to:
-        params['date_to'] = date_to
+    if date_from: params['date_from'] = date_from
+    if date_to: params['date_to'] = date_to
     
-    logger.info(f"🔗 Fetching {parameter.upper()} data for {city}")
-    logger.debug(f"Request params: {params}")
+    headers = {}
+    if OPENAQ_API_KEY:
+        headers['X-API-Key'] = OPENAQ_API_KEY
+
+    all_dfs = []
     
-    # v3 API URL
-    url = "https://api.openaq.org/v3/measurements"
-    
-    for attempt in range(1, MAX_RETRIES + 1):
-        try:
-            # v3 requires API key in header (but may work without for basic usage)
-            headers = {}
-            if OPENAQ_API_KEY:
-                headers['X-API-Key'] = OPENAQ_API_KEY
-            
-            response = requests.get(
-                url,
-                params=params,
-                headers=headers,
-                timeout=REQUEST_TIMEOUT
-            )
-            response.raise_for_status()
-            
-            data = response.json()
-            
-            if 'results' not in data:
-                logger.error(f"Unexpected API response format: {data}")
-                return pd.DataFrame()
-            
-            results = data['results']
-            
-            if not results:
-                logger.warning(f"No data returned for {parameter} in {city}")
-                return pd.DataFrame()
-            
-            logger.info(f"✅ Successfully fetched {len(results)} records (Attempt {attempt})")
-            
-            # Convert to DataFrame
-            df = pd.DataFrame(results)
-            
-            # Parse v3 response structure
-            # v3 has different structure than v2
-            processed_rows = []
-            for idx, row in df.iterrows():
-                try:
-                    processed_row = {
-                        'location': row.get('location', {}).get('name', 'Unknown'),
-                        'parameter': parameter,
-                        'value': row.get('value'),
-                        'unit': row.get('parameter', {}).get('units') if isinstance(row.get('parameter'), dict) else 'µg/m³',
-                        'date_utc': pd.to_datetime(row.get('datetime')),
-                        'city': city
-                    }
-                    processed_rows.append(processed_row)
-                except Exception as e:
-                    logger.warning(f"Skipping row {idx} due to parsing error: {e}")
-                    continue
-            
-            df = pd.DataFrame(processed_rows)
-            
-            if df.empty:
-                logger.warning("No valid data after processing")
-                return pd.DataFrame()
-            
-            # Data quality filtering
-            if parameter == 'pm25':
-                initial_count = len(df)
-                df = df[df['value'] <= MAX_PM25_VALUE]
-                filtered_count = initial_count - len(df)
-                if filtered_count > 0:
-                    logger.warning(f"Filtered out {filtered_count} records with PM2.5 > {MAX_PM25_VALUE}")
-            
-            return df
-            
-        except requests.exceptions.Timeout:
-            logger.warning(f"⏱️ Request timeout (Attempt {attempt}/{MAX_RETRIES})")
-            if attempt < MAX_RETRIES:
-                wait_time = RETRY_BACKOFF_FACTOR ** attempt
-                logger.info(f"Retrying in {wait_time} seconds...")
-                time.sleep(wait_time)
+    # If we have specific IDs, loop through them
+    if location_ids:
+        logger.info(f"🔗 Fetching {parameter.upper()} data for {len(location_ids)} locations in {city}")
+        for loc_id in location_ids:
+            # logger.debug(f"Fetching location {loc_id}...")
+            df = fetch_measurements_for_id(loc_id, params, headers, parameter)
+            if not df.empty:
+                all_dfs.append(df)
+            # Small delay to avoid rate limits
+            time.sleep(0.1) 
+    else:
+        # Legacy/Fallback path if no IDs provided (should not happen with new logic)
+        logger.warning("No location IDs provided to fetch_air_quality_data")
+        return pd.DataFrame()
+
+    if not all_dfs:
+        logger.warning(f"No data returned for {parameter} in {city} across all locations")
+        return pd.DataFrame()
         
-        except requests.exceptions.HTTPError as e:
-            logger.error(f"❌ HTTP Error: {e}")
-            logger.error(f"Response body: {e.response.text if hasattr(e, 'response') else 'N/A'}")
-            if e.response.status_code == 429:  # Rate limit
-                logger.warning("Rate limit exceeded. Waiting 60 seconds...")
-                time.sleep(60)
-            elif e.response.status_code == 410:  # Gone - deprecated API
-                logger.error("⚠️  API endpoint deprecated. Please ensure using v3 endpoints.")
-                break
-            elif e.response.status_code >= 500:  # Server error
-                if attempt < MAX_RETRIES:
-                    wait_time = RETRY_BACKOFF_FACTOR ** attempt
-                    logger.info(f"Server error. Retrying in {wait_time} seconds...")
-                    time.sleep(wait_time)
-            else:
-                break  # Don't retry for client errors
-        
-        except requests.exceptions.RequestException as e:
-            logger.error(f"❌ Request failed: {e}")
-            if attempt < MAX_RETRIES:
-                wait_time = RETRY_BACKOFF_FACTOR ** attempt
-                logger.info(f"Retrying in {wait_time} seconds...")
-                time.sleep(wait_time)
-        
-        except Exception as e:
-            logger.error(f"❌ Unexpected error: {e}", exc_info=True)
-            break
+    # Combine all results
+    combined_df = pd.concat(all_dfs, ignore_index=True)
+    logger.info(f"Successfully fetched {len(combined_df)} total records")
     
-    logger.error(f"Failed to fetch data after {MAX_RETRIES} attempts")
-    return pd.DataFrame()
+    # Clean and Filter
+    if not combined_df.empty and parameter == 'pm25':
+        initial_count = len(combined_df)
+        combined_df = combined_df[combined_df['value'] <= MAX_PM25_VALUE]
+        filtered_count = initial_count - len(combined_df)
+        if filtered_count > 0:
+            logger.warning(f"Filtered out {filtered_count} records with PM2.5 > {MAX_PM25_VALUE}")
+
+    return combined_df
+
+
+def get_city_locations(city_name: str = TARGET_CITY) -> list:
+    """
+    Fetch location IDs for a given city/region
+    """
+    url = "https://api.openaq.org/v3/locations"
+    params = {
+        "limit": 100,
+        "page": 1,
+        "iso": "AE",  # Filter by UAE
+    }
+    
+    headers = {}
+    if OPENAQ_API_KEY:
+        headers['X-API-Key'] = OPENAQ_API_KEY
+    
+    logger.info(f"🔎 Searching for locations in {city_name} (UAE)...")
+    
+    try:
+        response = requests.get(url, params=params, headers=headers, timeout=REQUEST_TIMEOUT)
+        response.raise_for_status()
+        data = response.json()
+        results = data.get('results', [])
+        
+        # Filter for city name in location name or other fields
+        # Note: v3 'city' field might be nested or named differently, 
+        # but searching 'name' is a good start.
+        city_locations = []
+        for loc in results:
+            # Check name or locality
+            name = loc.get('name', '').lower()
+            locality = loc.get('locality', '').lower() if loc.get('locality') else ''
+            
+            target = city_name.lower()
+            if target in name or target in locality:
+                city_locations.append(loc['id'])
+        
+        # Hardcoded known IDs for Abu Dhabi if search misses them (optional)
+        # But for now rely on search.
+        # Fallback: if 'Abu Dhabi' not found, maybe return all UAE locations?
+        # Let's return what we found.
+        
+        # Also include some known Abu Dhabi locations if list is empty
+        if not city_locations and city_name == "Abu Dhabi":
+             # Bida Zayed, Khadeeja School, etc are in AD region
+             # Let's assume all AE locations might be relevant if detailed filtering fails?
+             # No, better to be specific.
+             pass
+        
+        logger.info(f"✅ Found {len(city_locations)} locations for {city_name}: {city_locations}")
+        return city_locations
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to fetch locations: {e}")
+        return []
 
 
 
@@ -279,13 +352,21 @@ def fetch_abu_dhabi_air(days_back: int = 7, incremental: bool = True):
         
         logger.info(f"Date range: {date_from} to {date_to}")
         
+        # Get location IDs first
+        location_ids = get_city_locations(TARGET_CITY)
+        
+        if not location_ids:
+            logger.error(f"❌ No locations found for {TARGET_CITY}. Cannot fetch data.")
+            continue
+
         # Fetch data
         df = fetch_air_quality_data(
             city=TARGET_CITY,
             parameter=parameter,
-            limit=10000,  # Fetch more records
+            limit=10000,
             date_from=date_from,
-            date_to=date_to
+            date_to=date_to,
+            location_ids=location_ids
         )
         
         # Save data
@@ -311,7 +392,7 @@ def fetch_abu_dhabi_air(days_back: int = 7, incremental: bool = True):
         if result['file']:
             logger.info(f"  → File: {result['file']}")
     logger.info("=" * 80)
-    logger.info("✅ Data ingestion complete!")
+    logger.info("Data ingestion complete!")
     
     return all_results
 
