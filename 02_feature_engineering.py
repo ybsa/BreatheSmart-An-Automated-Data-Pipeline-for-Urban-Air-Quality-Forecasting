@@ -89,7 +89,9 @@ def process_data(df):
     
     # 2. Impute missing values
     # Linear interpolation for small gaps (up to 6 hours)
+    logging.info("Starting interpolation...")
     df_imputed = df.interpolate(method='linear', limit=6)
+    logging.info("Interpolation complete.")
     
     # 2.5 Handle Non-Overlapping Columns
     # If a feature column is entirely NaN for the rows where we have PM2.5, we must drop the COLUMN, not the rows.

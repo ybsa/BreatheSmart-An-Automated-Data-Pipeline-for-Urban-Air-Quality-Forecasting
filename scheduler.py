@@ -38,8 +38,31 @@ def job():
     """
     logger.info("⏰ Scheduled ingestion job triggered")
     try:
+        # 1. Ingestion
+        logger.info("Step 1: Fetching Data...")
         fetch_abu_dhabi_air(incremental=True)
-        logger.info("✅ Scheduled job completed successfully")
+        
+        # 2. Feature Engineering
+        logger.info("Step 2: Processing Data...")
+        # Since these are scripts with main blocks, we can run them via subprocess or import
+        # Importing is cleaner if we structured them as functions. 
+        # For simplicity/safety given the current script structure, let's use os.system or subprocess
+        # Actually, let's just trigger them via running command (safer for separate logging configs etc)
+        import subprocess
+        
+        subprocess.run(["python", "02_feature_engineering.py"], check=True)
+        
+        # 3. Model Retraining (Optional - maybe weekly? But let's do it daily for now to keep model fresh)
+        logger.info("Step 3: Retraining Model...")
+        subprocess.run(["python", "03_model_training.py"], check=True)
+
+        # 4. Prediction
+        logger.info("Step 4: Generating Forecast...")
+        subprocess.run(["python", "04_predict.py"], check=True)
+        
+        logger.info("✅ Full Pipeline completed successfully")
+    except subprocess.CalledProcessError as e:
+        logger.error(f"❌ Pipeline Step Failed: {e}")
     except Exception as e:
         logger.error(f"❌ Scheduled job failed: {e}", exc_info=True)
 
