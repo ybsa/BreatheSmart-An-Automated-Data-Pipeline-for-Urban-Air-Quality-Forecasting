@@ -42,3 +42,8 @@ python src/scheduler.py --mode test
 
 - **Data Quality**: Open `data/raw/` CSVs to ensure values are reasonable (e.g., PM2.5 < 1000).
 - **prediction.csv**: Ensure dates are increasing and logical.
+- **Visualization**: Run `python src/visualization.py` and check `reports/` for a valid PNG file.
+- **Dashboard**: Run `streamlit run src/app.py`, check that the local server starts, and verify:
+  - Current level matches `training_data.csv`.
+  - Forecast matches `predictions.csv`.
+  - Interactive chart renders without errors.

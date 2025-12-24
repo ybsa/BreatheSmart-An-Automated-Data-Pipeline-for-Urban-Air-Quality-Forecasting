@@ -29,6 +29,11 @@ graph TD
     Models --> ModelFile[xgboost_pm25.json]
     Models --> ModelFeats[model_features.pkl]
 
+    Src --> App[app.py]
+    Src --> Viz[visualization.py]
+    
+    Root --> Reports[reports/]
+
     subgraph "Data Flow"
         Ingestor -->|Writes| Raw
         Raw -->|Reads| FeatEng
@@ -38,6 +43,11 @@ graph TD
         Trainer -->|Writes| Models
         Models -->|Reads| Predictor
         Predictor -->|Writes| Preds
+        Processed -->|Reads| Viz
+        Preds -->|Reads| Viz
+        Viz -->|Writes| Reports
+        Processed -->|Reads| App
+        Preds -->|Reads| App
     end
 ```
 
@@ -51,9 +61,15 @@ graph TD
 - **`prediction.py`**: Generates forecasts for the next hour.
 - **`scheduler.py`**: Automates the pipeline to run daily or hourly.
 - **`config.py`**: Central configuration (API keys, paths, constants).
+- **`app.py`**: Streamlit dashboard for real-time monitoring and visualization.
+- **`visualization.py`**: Generates static trend charts for reporting.
 
 ### Data (`data/`)
 
 - **`raw/`**: Archival storage of fetched JSON/CSV data.
 - **`processed/`**: Cleaned, single-file dataset ready for training.
 - **`predictions.csv`**: History of all generated forecasts.
+
+### Reports (`reports/`)
+
+- **`pm25_trend_forecast.png`**: Generated visualization of recent trends.

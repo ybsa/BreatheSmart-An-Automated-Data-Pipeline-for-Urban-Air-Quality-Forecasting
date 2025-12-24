@@ -139,6 +139,22 @@ python src/scheduler.py --mode test
 
 ---
 
+## 💻 Web Dashboard
+
+To launch the interactive dashboard:
+
+```bash
+streamlit run src/app.py
+```
+
+Features:
+
+- **Real-time Metrics**: View current MP2.5 and forecasts.
+- **Interactive Chart**: Explore historical trends.
+- **Forecast Logs**: View prediction history.
+
+---
+
 ## 📊 Project Structure
 
 ```
