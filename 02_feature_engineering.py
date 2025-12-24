@@ -126,8 +126,9 @@ def process_data(df):
         df_cleaned[col_name] = df_cleaned[target_col].shift(lag)
     
     # Rolling Statistics
-    df_cleaned[f'{target_col}_rolling_mean_24h'] = df_cleaned[target_col].rolling(window=24).mean()
-    df_cleaned[f'{target_col}_rolling_std_24h'] = df_cleaned[target_col].rolling(window=24).std()
+    # Shift by 1 to prevent leakage (value at T should not use data from T)
+    df_cleaned[f'{target_col}_rolling_mean_24h'] = df_cleaned[target_col].rolling(window=24).mean().shift(1)
+    df_cleaned[f'{target_col}_rolling_std_24h'] = df_cleaned[target_col].rolling(window=24).std().shift(1)
     
     # Temporal Features
     df_cleaned['hour'] = df_cleaned.index.hour
