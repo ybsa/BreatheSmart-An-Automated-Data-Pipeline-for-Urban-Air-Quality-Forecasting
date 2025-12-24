@@ -29,6 +29,8 @@ The system is built across **5 phases**:
 4. **ML Predictor** - XGBoost forecasting (RMSE ~2.9 µg/m³)
 5. **Operational Forecasting** - Automated prediction script
 
+See [PROJECT_MAP.md](docs/PROJECT_MAP.md) for a detailed architecture diagram.
+
 ---
 
 ## 🚀 Quick Start
@@ -78,46 +80,40 @@ echo OPENAQ_API_KEY=your_actual_api_key_here > .env
 Fetch historical data (last 30 days) or start the daily ingestor:
 
 ```bash
-python data_ingestor.py
+python src/data_ingestor.py
 ```
 
 *Output:* Raw CSV files saved to `data/raw/` (e.g., `data/raw/abudhabi_pm25_20251224_000905.csv`).
 
 ### Step 2: Feature Engineering
 
-Process the raw data into a machine-learning-ready format. This step handles:
-
-- Merging multiple pollutant files
-- Resampling to hourly frequency
-- Imputing missing values
-- Generating Lag and Rolling Mean features (shifted to prevent leakage)
+Process the raw data into a machine-learning-ready format:
 
 ```bash
-python 02_feature_engineering.py
+python src/feature_engineering.py
 ```
 
 *Output:* Processed dataset saved to `data/processed/training_data.csv`.
 
 ### Step 3: Model Training
 
-Train the XGBoost Regressor on the processed data. The script uses a time-series split (Train: 80%, Test: 20%) to validate performance.
+Train the XGBoost Regressor on the processed data:
 
 ```bash
-python 03_model_training.py
+python src/model_training.py
 ```
 
 *Output:*
 
 - Trained model saved to `models/xgboost_pm25.json`
 - Feature list saved to `models/model_features.pkl`
-- Validated Test RMSE: ~2.9 µg/m³
 
 ### Step 4: Generate Forecasts
 
-Run the prediction engine to generate a forecast for the next hour based on the latest available data.
+Run the prediction engine to generate a forecast for the next hour:
 
 ```bash
-python 04_predict.py
+python src/prediction.py
 ```
 
 *Output:*
@@ -132,25 +128,40 @@ python 04_predict.py
 To run the ingestion pipeline on a schedule (e.g., daily at 2:00 AM):
 
 ```bash
-python scheduler.py
+python src/scheduler.py
 ```
+
+To run a single test loop:
+
+```bash
+python src/scheduler.py --mode test
+```
+
+---
 
 ## 📊 Project Structure
 
 ```
+├── src/                 # Source code
+│   ├── config.py
+│   ├── data_ingestor.py
+│   ├── feature_engineering.py
+│   ├── model_training.py
+│   ├── prediction.py
+│   └── scheduler.py
+├── tests/               # Test scripts
+│   └── test_ingestor.py
 ├── data/
-│   ├── raw/                 # Raw CSVs from OpenAQ
-│   ├── processed/           # Cleaned training data
-│   └── predictions.csv      # Log of generated forecasts
-├── logs/                    # System logs
-├── models/                  # Trained XGBoost artifacts
-├── notebooks/               # EDA and Analysis
-│   └── 01_eda_and_bias_analysis.ipynb
-├── 02_feature_engineering.py
-├── 03_model_training.py
-├── 04_predict.py
-├── data_ingestor.py
-├── config.py
+│   ├── raw/             # Raw CSVs
+│   ├── processed/       # Cleaned training data
+│   └── predictions.csv  # Forecast logs
+├── docs/                # Project Documentation
+│   ├── PROJECT_MAP.md
+│   └── TEST_PLAN.md
+├── logs/                # System logs
+├── models/              # Trained XGBoost artifacts
+├── notebooks/           # EDA and Analysis
+├── scripts/             # Utility scripts
 └── requirements.txt
 ```
 

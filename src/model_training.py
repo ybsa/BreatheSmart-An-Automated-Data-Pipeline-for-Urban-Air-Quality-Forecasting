@@ -1,3 +1,25 @@
+"""
+BreatheSmart Model Training
+---------------------------
+Trains an XGBoost Regressor to predict PM2.5 levels.
+
+Methodology:
+- Loads processed training data.
+- Splits data into Train (80%) and Test (20%) sets employing Time Series Split.
+- Trains an XGBoost model with early stopping.
+- Evaluates performance using RMSE, MAE, and R2.
+- Saves the model and feature list for the prediction service.
+
+Usage:
+    python src/model_training.py
+
+Input:
+    data/processed/training_data.csv
+
+Output:
+    models/xgboost_pm25.json
+    models/model_features.pkl
+"""
 import pandas as pd
 import xgboost as xgb
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score

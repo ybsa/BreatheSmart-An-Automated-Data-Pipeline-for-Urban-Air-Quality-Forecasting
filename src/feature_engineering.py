@@ -1,3 +1,26 @@
+"""
+BreatheSmart Feature Engineering
+--------------------------------
+Transforms raw air quality data into machine-learning-ready features.
+
+Key operations:
+1. Aggregation: Resamples raw data to hourly averages.
+2. Imputation: Fills missing values using linear interpolation (limit 6h).
+3. Feature Creation:
+   - Lag features (1h, 2h, 3h, 24h)
+   - Rolling statistics (24h mean/std)
+   - Temporal features (hour, day of week, month)
+4. Cleaning: Removes rows with missing targets or insufficient history.
+
+Usage:
+    python src/feature_engineering.py
+
+Input:
+    data/raw/abudhabi_*.csv
+
+Output:
+    data/processed/training_data.csv
+"""
 import pandas as pd
 import glob
 import os

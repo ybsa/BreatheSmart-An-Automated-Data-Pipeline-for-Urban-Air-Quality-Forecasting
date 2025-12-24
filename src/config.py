@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Project Paths
-BASE_DIR = Path(__file__).parent
+BASE_DIR = Path(__file__).parent.parent
 RAW_DATA_PATH = BASE_DIR / os.getenv('RAW_DATA_PATH', 'data/raw')
 PROCESSED_DATA_PATH = BASE_DIR / os.getenv('PROCESSED_DATA_PATH', 'data/processed')
 LOGS_PATH = BASE_DIR / os.getenv('LOGS_PATH', 'logs')

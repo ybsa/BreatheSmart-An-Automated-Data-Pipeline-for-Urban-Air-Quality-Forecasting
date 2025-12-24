@@ -1,11 +1,20 @@
 """
 BreatheSmart Data Ingestor
-Production-ready air quality data fetcher from OpenAQ API v2
+--------------------------
+Production-ready air quality data fetcher from OpenAQ API v2/v3.
 
-This script fetches PM2.5 and other pollutant data for Abu Dhabi
-with robust error handling, retry logic, and incremental loading.
+This script manages the extraction of pollutant data (PM2.5, PM10, etc.) for a specified city.
+It includes:
+- Robust error handling and exponential backoff
+- Incremental data loading to avoid duplicate fetches
+- Resolving location IDs dynamically
+- Quality checks and filtering
 
-Author: BreatheSmart Team
+Usage:
+    python src/data_ingestor.py
+
+Output:
+    Saves CSV files to data/raw/
 """
 import requests
 import pandas as pd

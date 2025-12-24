@@ -6,7 +6,9 @@ import sys
 from datetime import datetime, timedelta
 
 # Add current directory to path
-sys.path.insert(0, '.')
+# Add src directory to path
+import os
+sys.path.insert(0, os.path.join(os.getcwd(), 'src'))
 
 from data_ingestor import fetch_air_quality_data, save_data
 from config import TARGET_CITY

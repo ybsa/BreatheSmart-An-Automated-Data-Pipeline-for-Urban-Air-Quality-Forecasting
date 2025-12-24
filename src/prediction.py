@@ -1,3 +1,23 @@
+"""
+BreatheSmart Prediction Engine
+------------------------------
+Generates PM2.5 forecasts for the next hour using the trained XGBoost model.
+
+Process:
+1. Loads the latest available data from `data/processed/training_data.csv`.
+2. Constructs the feature vector for T+1 (next hour).
+    - Lags are derived from T, T-1, ...
+    - Rolling stats are calculated from T-23 to T.
+3. Loads the saved model artifacts.
+4. Generates and logs the prediction.
+
+Usage:
+    python src/prediction.py
+
+Output:
+    data/predictions.csv (appended)
+    Console output
+"""
 import pandas as pd
 import xgboost as xgb
 import joblib
