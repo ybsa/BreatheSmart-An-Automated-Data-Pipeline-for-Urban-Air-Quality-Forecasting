@@ -36,16 +36,13 @@ repos:
     hooks:
       - id: flake8
         args: ['--max-line-length=120', '--extend-ignore=E203,W503']
-        additional_dependencies:
-          - flake8-docstrings
-          - flake8-bugbear
 
   # Security checks
   - repo: https://github.com/PyCQA/bandit
     rev: 1.7.7
     hooks:
       - id: bandit
-        args: ['-r', 'src/', '-ll']
+        args: ['-ll', '-r', 'src/']
         exclude: tests/
 
   # Type checking (optional - can be slow)
