@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment files
+.env
+
+# Data files (use volumes instead)
+data/raw/*
+data/processed/*
+data/predictions.csv
+!data/.gitkeep
+
+# Logs
+logs/*
+!logs/.gitkeep
+
+# Models (optional: include if you want pre-trained model in image)
+# models/*
+# !models/.gitkeep
+
+# Reports
+reports/*
+!reports/.gitkeep
+
+# Jupyter
+.ipynb_checkpoints/
+notebooks/.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Tests (optional: exclude for smaller production image)
+# tests/
+# pytest.ini
+
+# Documentation (optional)
+# docs/

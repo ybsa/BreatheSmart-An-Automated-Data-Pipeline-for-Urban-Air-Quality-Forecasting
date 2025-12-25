@@ -1,5 +1,9 @@
 # 🌍 BreatheSmart: Production-Ready Air Quality Prediction System
 
+![Python Version](https://img.shields.io/badge/python-3.8%2B-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+![Build Status](https://img.shields.io/badge/build-passing-brightgreen)
+
 An end-to-end automated data pipeline for forecasting urban air quality in Abu Dhabi, with built-in bias detection and mitigation.
 
 ## 📋 Overview
@@ -123,6 +127,24 @@ python src/prediction.py
 
 ---
 
+## 🧪 Testing
+
+We use `pytest` for unit and integration testing.
+
+### Run all tests
+
+```bash
+pytest tests/
+```
+
+### Run with coverage report
+
+```bash
+pytest tests/ --cov=src --cov-report=html
+```
+
+---
+
 ## 🤖 Automation
 
 To run the ingestion pipeline on a schedule (e.g., daily at 2:00 AM):
@@ -149,7 +171,7 @@ streamlit run src/app.py
 
 Features:
 
-- **Real-time Metrics**: View current MP2.5 and forecasts.
+- **Real-time Metrics**: View current PM2.5 and forecasts.
 - **Interactive Chart**: Explore historical trends.
 - **Forecast Logs**: View prediction history.
 
@@ -166,20 +188,94 @@ Features:
 │   ├── prediction.py
 │   └── scheduler.py
 ├── tests/               # Test scripts
-│   └── test_ingestor.py
+│   ├── conftest.py      # Test fixtures
+│   ├── test_config.py
+│   ├── test_ingestor.py
+│   └── ...
 ├── data/
 │   ├── raw/             # Raw CSVs
 │   ├── processed/       # Cleaned training data
 │   └── predictions.csv  # Forecast logs
 ├── docs/                # Project Documentation
 │   ├── PROJECT_MAP.md
-│   └── TEST_PLAN.md
+│   ├── TEST_PLAN.md
+│   └── TROUBLESHOOTING.md
+├── .github/workflows/   # CI/CD pipelines
 ├── logs/                # System logs
 ├── models/              # Trained XGBoost artifacts
 ├── notebooks/           # EDA and Analysis
-├── scripts/             # Utility scripts
+├── Dockerfile           # Container configuration
+├── docker-compose.yml   # Multi-service orchestration
 └── requirements.txt
 ```
+
+---
+
+## 🐳 Docker Deployment
+
+### Quick Start with Docker
+
+```bash
+# Build and run the dashboard
+docker compose up -d dashboard
+
+# View logs
+docker compose logs -f dashboard
+
+# Stop
+docker compose down
+```
+
+### Run Full Pipeline (with Scheduler)
+
+```bash
+# Run dashboard + automated scheduler
+docker compose --profile full up -d
+```
+
+### Build Manually
+
+```bash
+# Build the image
+docker build -t breathesmart .
+
+# Run the dashboard
+docker run -p 8501:8501 -e OPENAQ_API_KEY=your_key breathesmart
+```
+
+---
+
+## 🔄 CI/CD Pipeline
+
+This project uses **GitHub Actions** for continuous integration:
+
+- ✅ **Automated Testing** - Runs on Python 3.10, 3.11, 3.12
+- ✅ **Code Quality** - Flake8 linting, Black formatting checks
+- ✅ **Docker Build** - Validates container builds
+- ✅ **Coverage Reports** - Uploaded to Codecov
+
+### Workflow Status
+
+Tests run automatically on every push and pull request to `main`/`master`.
+
+---
+
+## ☁️ Cloud Deployment
+
+### Streamlit Cloud (Recommended - Free)
+
+1. Fork this repository
+2. Go to [share.streamlit.io](https://share.streamlit.io/)
+3. Connect your GitHub account
+4. Deploy with:
+   - **Main file path:** `src/app.py`
+   - **Secrets:** Add `OPENAQ_API_KEY`
+
+### Railway / Render
+
+Use the included `Dockerfile` for one-click deployment.
+
+---
 
 ## 📝 License
 

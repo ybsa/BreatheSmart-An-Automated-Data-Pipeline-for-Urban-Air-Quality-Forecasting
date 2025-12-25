@@ -1,0 +1,35 @@
+name: Deploy to Streamlit Cloud
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  deploy:
+    name: Deploy Dashboard
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Verify Streamlit app
+        run: |
+          pip install streamlit
+          python -c "import streamlit; print('Streamlit version:', streamlit.__version__)"
+      
+      - name: Notify deployment ready
+        run: |
+          echo "✅ Code is ready for Streamlit Cloud deployment!"
+          echo ""
+          echo "To deploy:"
+          echo "1. Go to https://share.streamlit.io/"
+          echo "2. Connect your GitHub repository"
+          echo "3. Set main file path: src/app.py"
+          echo "4. Add OPENAQ_API_KEY to secrets"

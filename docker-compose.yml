@@ -1,0 +1,36 @@
+services:
+  # Main Streamlit Dashboard
+  dashboard:
+    build: .
+    container_name: breathesmart-dashboard
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./logs:/app/logs
+    environment:
+      - OPENAQ_API_KEY=${OPENAQ_API_KEY}
+      - TARGET_CITY=${TARGET_CITY:-Abu Dhabi}
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8501/_stcore/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Scheduled Pipeline Runner (optional)
+  scheduler:
+    build: .
+    container_name: breathesmart-scheduler
+    command: python src/scheduler.py --mode daily
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./logs:/app/logs
+    environment:
+      - OPENAQ_API_KEY=${OPENAQ_API_KEY}
+      - TARGET_CITY=${TARGET_CITY:-Abu Dhabi}
+    restart: unless-stopped
+    profiles:
+      - full # Only runs with: docker compose --profile full up

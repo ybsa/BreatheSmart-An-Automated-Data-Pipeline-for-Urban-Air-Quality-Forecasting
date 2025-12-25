@@ -1,49 +1,73 @@
 # 🧪 BreatheSmart Test Plan
 
-This document outlines the testing strategy for the BreatheSmart Automated Data Pipeline.
+## 🎯 Testing Strategy
 
-## 1. Unit Testing
+The goal of this test plan is to ensure the reliability and accuracy of the BreatheSmart air quality prediction pipeline. We use a multi-layered approach involving unit tests, integration tests, and manual verification.
 
-Unit tests focus on individual components in isolation.
+## 🏗️ Test Layers
 
-| Component | Test File | Test Cases |
-|-----------|-----------|------------|
-| **Ingestor** | `tests/test_ingestor.py` | - Verify API connection <br> - Verify data fetching for valid city <br> - Check CSV saving functionality <br> - Handle API errors/empty responses |
-| **Feature Eng.** | *Manual/Script* | - Input: valid raw CSV -> Output: `training_data.csv` exists <br> - Input: empty file -> Output: Handle gracefully |
-| **Model** | *Manual/Script* | - Input: `training_data.csv` -> Output: `model.json` exists <br> - Verify RMSE is within acceptable range (< 5.0) |
+### 1. Unit Testing
 
-## 2. Integration Testing
+Testing individual components in isolation.
 
-Integration tests verify that components work together.
+- **Locations**: `tests/test_*.py`
+- **Framework**: `pytest`
+- **Focus**: Function-level logic, error handling, data transformations.
 
-### Pipeline Flow
+### 2. Integration Testing
 
-1. **Ingest -> Process**: Run ingestor, then run feature engineering. Verify `training_data.csv` contains data from the new ingest.
-2. **Process -> Train**: Run training. Verify model artifacts are updated.
-3. **Train -> Predict**: Run prediction. Verify it produces a value using the new model.
+Testing multiple components working together.
 
-## 3. System Testing (End-to-End)
+- **Focus**: API to Storage flow, Feature Engineering to Model input.
+- **Scripts**: `tests/test_ingestor.py`
 
-Use `src/scheduler.py` in test mode to run the full cycle.
+### 3. Manual Verification
 
-**Command:**
+End-to-end checks of the system output.
+
+- **Focus**: Dashboard UI, Scheduler loops, Log auditing.
+
+## 🚀 Execution Commands
+
+### Run all tests
 
 ```bash
-python src/scheduler.py --mode test
+pytest tests/
 ```
 
-**Pass Criteria:**
+### Run with coverage report
 
-1. Log file created in `logs/scheduler_*.log`.
-2. Execution flows through Steps 1-4 without crash.
-3. `data/predictions.csv` has a new entry.
+```bash
+pytest tests/ --cov=src --cov-report=term-missing
+```
 
-## 4. Manual Validations
+### Run specific module tests
 
-- **Data Quality**: Open `data/raw/` CSVs to ensure values are reasonable (e.g., PM2.5 < 1000).
-- **prediction.csv**: Ensure dates are increasing and logical.
-- **Visualization**: Run `python src/visualization.py` and check `reports/` for a valid PNG file.
-- **Dashboard**: Run `streamlit run src/app.py`, check that the local server starts, and verify:
-  - Current level matches `training_data.csv`.
-  - Forecast matches `predictions.csv`.
-  - Interactive chart renders without errors.
+```bash
+pytest tests/test_data_ingestor.py
+```
+
+## 📋 Test Matrix
+
+| Component | Test File | Test Case | Success Criteria |
+|-----------|-----------|-----------|------------------|
+| Config | `test_config.py` | Load .env | Keys are loaded correctly |
+| Ingestor | `test_data_ingestor.py` | Fetch API | Dataframe returned with data |
+| Feature Eng | `test_feature_engineering.py` | Lag Generation | Features match expected shift |
+| Model | `test_model_training.py` | Save/Load | Artifacts are valid JSON/PKL |
+| Predictor | `test_prediction.py` | Single Forecast | Numeric output > 0 |
+
+## 🧪 Manual Checklists
+
+### Dashboard Verification
+
+- [ ] Run `streamlit run src/app.py`
+- [ ] Verify "Current Level" matches latest raw data
+- [ ] Verify "Forecast" line is visible on chart
+- [ ] Check sidebar for any error warnings
+
+### Scheduler Verification
+
+- [ ] Run `python src/scheduler.py --mode test`
+- [ ] Verify logs show full loop completion
+- [ ] Check `data/predictions.csv` for the new timestamp
