@@ -277,6 +277,46 @@ Use the included `Dockerfile` for one-click deployment.
 
 ---
 
+## 🤖 MLOps Features
+
+### Experiment Tracking (MLflow)
+
+```bash
+# Start MLflow UI
+mlflow ui
+# View experiments at http://localhost:5000
+```
+
+### Model Monitoring
+
+```bash
+# Run health checks on predictions
+python src/monitoring.py
+```
+
+### Data Versioning (DVC)
+
+```bash
+# Track training data
+dvc add data/processed/training_data.csv
+dvc push
+```
+
+### Pre-commit Hooks
+
+```bash
+# Install hooks
+pip install pre-commit
+pre-commit install
+
+# Run manually
+pre-commit run --all-files
+```
+
+See [MLOPS_GUIDE.md](docs/MLOPS_GUIDE.md) for detailed documentation.
+
+---
+
 ## 📝 License
 
 Distributed under the MIT License. See `LICENSE` for more information.
