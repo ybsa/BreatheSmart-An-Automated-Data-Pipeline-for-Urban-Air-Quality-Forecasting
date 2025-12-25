@@ -1,0 +1,9 @@
+# DVC tracked files
+# Add data files with: dvc add data/processed/training_data.csv
+# Then: git add data/processed/training_data.csv.dvc .gitignore
+
+# To push data to remote:
+# dvc push
+
+# To pull data from remote:
+# dvc pull

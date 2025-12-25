@@ -1,0 +1,17 @@
+# DVC Configuration for Data Versioning
+# Setup: pip install dvc && dvc init
+
+[core]
+    remote = local_storage
+    autostage = true
+
+['remote "local_storage"']
+    url = .dvc_cache
+
+# For cloud storage, configure one of:
+# ['remote "s3"']
+#     url = s3://your-bucket/dvc
+# ['remote "gcs"']
+#     url = gs://your-bucket/dvc
+# ['remote "azure"']
+#     url = azure://your-container/dvc
